@@ -6,5 +6,6 @@
   <ItemGroup>
     <Compile Include="Layer0.fs" />
     <Compile Include="Layer1.fs" />
+    <Compile Include="Layer2.fs" />
   </ItemGroup>
 </Project>
