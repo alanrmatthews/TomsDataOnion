@@ -17,4 +17,5 @@ let payload0 = GetPayload(readEmbeddedResource "App.input.dataonion.txt")
 let layer1 = Layer0.Ascii85Decode payload0
 let layer2 = Layer1.Peel(GetPayload layer1)
 let layer3 = Layer2.Peel(GetPayload layer2)
-printfn "%s" layer3
+let layer4 = Layer3.Peel(GetPayload layer3)
+printfn "%s" layer4

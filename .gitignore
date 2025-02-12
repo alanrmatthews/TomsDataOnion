@@ -26,3 +26,5 @@ src/App/input
 # Ignore temporary files
 *.tmp
 *.temp
+
+.fake
