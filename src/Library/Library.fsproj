@@ -8,5 +8,6 @@
     <Compile Include="Layer1.fs" />
     <Compile Include="Layer2.fs" />
     <Compile Include="Layer3.fs" />
+    <Compile Include="Layer4.fs" />
   </ItemGroup>
 </Project>
