@@ -30,4 +30,4 @@ module Tests =
                0x00uy
                0xc7uy |]
 
-        Assert.True(Layer4.ipv4ChecksumCorrect (bytes, 0))
+        Assert.True(Layer4.ipv4ChecksumCorrect bytes)

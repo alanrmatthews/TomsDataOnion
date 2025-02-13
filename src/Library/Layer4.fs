@@ -2,37 +2,69 @@ namespace TomsDataOnion.Library
 
 
 module Layer4 =
-    let ipv4ChecksumCorrect (bytes: byte[], i: int) =
+    let validateOnesComplementChecksum (bytes: byte[], checksumByte: int32) =
+        let checksum =
+            uint16 bytes[checksumByte + 0] <<< 8 ||| uint16 bytes[checksumByte + 1]
+
+        let seq = seq { for i in 0..2 .. (bytes.Length - 1) -> i }
+
         let sum =
-            uint32 (uint16 bytes[i + 0] <<< 8 ||| uint16 bytes[i + 1])
-            + uint32 (uint16 bytes[i + 2] <<< 8 ||| uint16 bytes[i + 3])
-            + uint32 (uint16 bytes[i + 4] <<< 8 ||| uint16 bytes[i + 5])
-            + uint32 (uint16 bytes[i + 6] <<< 8 ||| uint16 bytes[i + 7])
-            + uint32 (uint16 bytes[i + 8] <<< 8 ||| uint16 bytes[i + 9])
-            + uint32 (uint16 bytes[i + 12] <<< 8 ||| uint16 bytes[i + 13])
-            + uint32 (uint16 bytes[i + 14] <<< 8 ||| uint16 bytes[i + 15])
-            + uint32 (uint16 bytes[i + 16] <<< 8 ||| uint16 bytes[i + 17])
-            + uint32 (uint16 bytes[i + 18] <<< 8 ||| uint16 bytes[i + 19])
+            let totalSum =
+                Seq.fold (fun acc i -> acc + uint32 (uint16 bytes[i + 0] <<< 8 ||| uint16 bytes[i + 1])) 0u seq
+
+            totalSum - uint32 checksum
 
         let carryAddition = uint16 ((sum &&& 0xFFFFu) + (sum >>> 16))
-        let not = ~~~carryAddition
-        let checksum = uint32 (uint16 bytes[i + 10] <<< 8 ||| uint16 bytes[i + 11])
-        ~~~carryAddition = (uint16 bytes[i + 10] <<< 8 ||| uint16 bytes[i + 11])
+        ~~~carryAddition = checksum
 
+    let ipv4ChecksumCorrect (packet: byte[]) =
+        validateOnesComplementChecksum (packet.[0..19], 10)
+
+    let udpChecksumCorrect (packet: byte[]) =
+        let pseudoHeader =
+            let header =
+                Array.concat [ packet.[12..19]; [| 0uy; 17uy; packet[24]; packet[25] |]; packet.[20..] ]
+
+            if packet.Length % 2 = 0 then
+                header
+            else
+                Array.append header [| 0uy |]
+
+        validateOnesComplementChecksum (pseudoHeader, 18)
 
     let Peel (payload: string) =
+        let GetPacket (bytes: byte[]) =
+            let mutable i = 0
+
+            seq {
+                while i < bytes.Length do
+                    let length = int32 (uint16 bytes[i + 2] <<< 8 ||| uint16 bytes[i + 3])
+                    let packet = bytes[i .. i + length - 1]
+                    i <- i + length
+                    yield packet
+            }
+
+        let GetPayload (packet: byte[]) = packet[28..]
+
         let bytes = Layer0.Ascii85DecodeBytes payload
 
-        let sourceIPValid (i: int) =
-            bytes[i + 12] = 10uy
-            && bytes[i + 13] = 0uy
-            && bytes[i + 14] = 0uy
-            && bytes[i + 15] = 10uy
+        let sourceIPValid (packet: byte[]) =
+            packet[12] = 10uy && packet[13] = 1uy && packet[14] = 1uy && packet[15] = 10uy
 
-        let destinationIPValid (i: int) =
-            bytes[i + 16] = 10uy
-            && bytes[i + 17] = 0uy
-            && bytes[i + 18] = 0uy
-            && bytes[i + 19] = 200uy
+        let destinationIPValid (packet: byte[]) =
+            packet[16] = 10uy && packet[17] = 1uy && packet[18] = 1uy && packet[19] = 200uy
 
-        "TODO"
+        let IsPacketValid (packet: byte[]) =
+            sourceIPValid packet
+            && destinationIPValid packet
+            && ipv4ChecksumCorrect packet
+            && udpChecksumCorrect packet
+
+        let byteArray =
+            GetPacket bytes
+            |> Seq.filter IsPacketValid
+            |> Seq.map GetPayload
+            |> Seq.collect id
+            |> Seq.toArray
+
+        System.Text.Encoding.ASCII.GetString(byteArray)
